@@ -11,9 +11,9 @@ from multiprocessing import Value
 
 totalPages = None
 class childPage:
-        def __init__(self, url, hops):
-            self.url = url
-            self.hops = hops
+    def __init__(self, url, hops):
+        self.url = url
+        self.hops = hops
 
 def init(args):
     #shared page counter
@@ -60,12 +60,12 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
                 if partialLink not in logUrl and partialLink != child.url:
                     childrenPages.append(childPage(partialLink,child.hops+1))
                     logUrl.append(partialLink)
-        return
+        return 1
 
 
     except:
         #print("error at this url: " + child.url +" Skiped")
-        return 
+        return 0
 
 
 def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
@@ -92,13 +92,13 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         #print(f"working on url: {childrenPages[0].url}")
         #print(f"page saved so far: {totalPages}")
-        ParseHTML(childrenPages[0], 0, childrenPages, fileCounter, logUrl, school)
+        count = ParseHTML(childrenPages[0], 0, childrenPages, fileCounter, logUrl, school)
         if totalPages.value %10 ==0: 
             print(f"total: {totalPages.value} max: {MAX_PAGE}...")
         
         #print(f"totalPages {totalPages.value}")
         with totalPages.get_lock():
-            totalPages.value += 1
+            totalPages.value += count
         fileCounter += 1
         childrenPages.pop(0)
         #sleep(0.01)
@@ -108,6 +108,7 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     
 
 if __name__ == '__main__':
+    mp.freeze_support()
     print(os.getcwd())
     #path =  "us_universities.csv"
     path = input("Enter Seeds file path:")
@@ -124,13 +125,13 @@ if __name__ == '__main__':
     # else:print('file aaaaaaaaaa exits')
     
     print(path) 
-    saveFile(os.path.join(fileDir, "aa.txt"), "data", "a")
+    
     MAX_PAGE = input("Enter Max number of pages:")
     #print(f"max : {MAX_PAGE}")
     MAX_HOPS = input("Enter Max number of Hops:")
-    print(f"max : {MAX_HOPS}")
+    #print(f"max : {MAX_HOPS}")
     num_cores = int(mp.cpu_count())
-    mp.freeze_support()
+   
     print("This PC has: " + str(num_cores) + " cores")
     numProcess = input("Enter number of process, or 'Enter' to use default core value:")
     if numProcess != "":
@@ -162,3 +163,4 @@ if __name__ == '__main__':
     elapsed_min = elapsed_sec // 60
     elapsed_sec = elapsed_sec % 60
     print("Total Time :" "{:.0f}".format(elapsed_min) + " Minutes " + "{:.2f}".format(elapsed_sec) + "sec")
+    exit = input("program finished, enter 'y' to exit")
