@@ -7,7 +7,7 @@ import multiprocessing as mp
 import os
 import datetime
 import time
-from multiprocessing import Process, Value, Lock
+from multiprocessing import Value
 
 totalPages = None
 class childPage:
@@ -63,14 +63,14 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
 
 
     except:
-        print("error at this url: " + child.url +" Skiped")
+        #print("error at this url: " + child.url +" Skiped")
         return 
 
 
 def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     global totalPages
     
-    if totalPages.value > int(MAX_PAGE):
+    if totalPages.value >= int(MAX_PAGE):
         return 
     school = seed[0]
     print(f"Starting new edu: {school}")
@@ -84,20 +84,21 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     while len(childrenPages):
         #print(f'max hop: {MAX_HOPS}')
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
-        if totalPages.value > int(MAX_PAGE) or childrenPages[0].hops> int(MAX_HOPS) :
+        if totalPages.value >= int(MAX_PAGE) or childrenPages[0].hops> int(MAX_HOPS) :
             return 
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         #print(f"working on url: {childrenPages[0].url}")
         #print(f"page saved so far: {totalPages}")
         ParseHTML(childrenPages[0], 0, childrenPages, fileCounter, logUrl, school)
-        print(f"total: {totalPages.value} max: {MAX_PAGE}")
+        if totalPages.value %100 ==0: 
+            print(f"total: {totalPages.value} max: {MAX_PAGE}")
         
         #print(f"totalPages {totalPages.value}")
         with totalPages.get_lock():
             totalPages.value += 1
         fileCounter += 1
         childrenPages.pop(0)
-        sleep(0.1)
+        sleep(0.01)
     childrenPages =[]
     logUrl=[]
     return fileCounter
@@ -131,11 +132,12 @@ if __name__ == '__main__':
     # for seed in seeds:
     #     a=eduCrawler(seed)
     #     exit(1)
+    start_t=datetime.datetime.now()
     totalPages = Value('i', 0)
     try:
         pool = mp.Pool(num_cores, initializer = init, initargs = (totalPages, ))
         for seed in seeds:
-            if totalPages.value > int(MAX_PAGE):
+            if totalPages.value >= int(MAX_PAGE):
                 break
             i =pool.apply_async(eduCrawler, args=(seed,MAX_PAGE,MAX_HOPS,), callback=None)
 
@@ -144,3 +146,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pool.terminate()
         pool.join()
+    end_t = datetime.datetime.now()
+    elapsed_sec = (end_t - start_t).total_seconds()
+    elapsed_min = elapsed_sec // 60
+    elapsed_sec = elapsed_sec % 60
+    print("Total Time :" "{:.0f}".format(elapsed_min) + " Minutes " + "{:.2f}".format(elapsed_sec) + "sec")
