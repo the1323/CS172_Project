@@ -29,7 +29,7 @@ def saveFile(fname, data, mode):
 
 
 def LogFile(school, url, fileCounter,fSize):
-    fileDir = os.path.dirname(__file__)
+    fileDir = os.getcwd()
     path = os.path.join(fileDir, "log.csv")
     with open(path, 'a', newline='', encoding='utf-8') as csvfile:
         csvwriter = csv.writer(csvfile)
@@ -39,13 +39,14 @@ def LogFile(school, url, fileCounter,fSize):
 
 def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
     global totalPages
+    
     #print('hhhhhhhhhhhh')
     #print(child.hops)
     try:
         response = requests.get(child.url)
-        saveFile(f"Part A/DataFiles/{school}_{fileCounter}.html", response.text, 'w')
+        saveFile(f"DataFiles/{school}_{fileCounter}.html", response.text, 'w')
         LogFile(school, child.url, fileCounter,len(response.content))
-        allPage = BeautifulSoup(response.content, "html.parser")
+        allPage = BeautifulSoup(response.content, "html.parser",from_encoding="iso-8859-1")
         #print(allPage)
         
         hyperLinks = allPage.findAll("a", href=True)
@@ -85,35 +86,45 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
         #print(f'max hop: {MAX_HOPS}')
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         if totalPages.value >= int(MAX_PAGE) or childrenPages[0].hops> int(MAX_HOPS) :
+            childrenPages.clear()
+            logUrl.clear()
             return 
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         #print(f"working on url: {childrenPages[0].url}")
         #print(f"page saved so far: {totalPages}")
         ParseHTML(childrenPages[0], 0, childrenPages, fileCounter, logUrl, school)
-        if totalPages.value %100 ==0: 
-            print(f"total: {totalPages.value} max: {MAX_PAGE}")
+        if totalPages.value %10 ==0: 
+            print(f"total: {totalPages.value} max: {MAX_PAGE}...")
         
         #print(f"totalPages {totalPages.value}")
         with totalPages.get_lock():
             totalPages.value += 1
         fileCounter += 1
         childrenPages.pop(0)
-        sleep(0.01)
-    childrenPages =[]
-    logUrl=[]
-    return fileCounter
+        #sleep(0.01)
+    childrenPages.clear()
+    logUrl.clear()
+    
     
 
 if __name__ == '__main__':
-    path =  "us_universities.csv"
-    if os.path.exists(path):
-        print('file not exits')
-    else:print('file aaaaaaaaaa exits')
-    fileDir = os.path.dirname(__file__)
+    print(os.getcwd())
+    #path =  "us_universities.csv"
+    path = input("Enter Seeds file path:")
+    fileDir = os.getcwd()
     path = os.path.join(fileDir, path)
-    print(path) 
-        #path = input("Enter Seeds file path:")
+
+    while not os.path.exists(path):
+        path = input("File not found, Enter Seeds file path:")
+        fileDir = os.path.dirname(__file__)
+        path = os.path.join(fileDir, path)
+
+    # if os.path.exists(path):
+    #     print('file not exits')
+    # else:print('file aaaaaaaaaa exits')
     
+    print(path) 
+    saveFile(os.path.join(fileDir, "aa.txt"), "data", "a")
     MAX_PAGE = input("Enter Max number of pages:")
     #print(f"max : {MAX_PAGE}")
     MAX_HOPS = input("Enter Max number of Hops:")
