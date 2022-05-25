@@ -8,6 +8,10 @@ import os
 import datetime
 import time
 from multiprocessing import Value
+import json
+import unicodedata
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 totalPages = None
 class childPage:
@@ -39,16 +43,35 @@ def LogFile(school, url, fileCounter,fSize):
 
 def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
     global totalPages
-    
-    #print('hhhhhhhhhhhh')
-    #print(child.hops)
+
     try:
-        response = requests.get(child.url)
-        saveFile(f"DataFiles/{school}_{fileCounter}.html", response.text, 'w')
+        
+        response = requests.get(child.url, verify = False)
+        
+        if not response.ok:
+            return 0
+        #saveFile(f"DataFiles/{school}_{fileCounter}.html", response.text, 'w')
         LogFile(school, child.url, fileCounter,len(response.content))
         allPage = BeautifulSoup(response.content, "html.parser",from_encoding="iso-8859-1")
         #print(allPage)
         
+        title = allPage.find('title')
+        allowlist = [
+        'p',
+        'div',
+        'span'
+        ]
+
+        text = [t for t in allPage.findAll(text=True) if t.parent.name in allowlist]
+        
+        
+        # get all visible text, since some site write stuff outside of body tag, I just get everything, even though lots of useless data..
+        textStr = ""
+        for t in text:
+            if t != "\n":
+                textStr+=t
+        textStr=(unicodedata.normalize('NFKD', textStr).encode('ascii', 'ignore'))
+        childUrls = []
         hyperLinks = allPage.findAll("a", href=True)
         
         for link in hyperLinks:
@@ -60,11 +83,21 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
                 if partialLink not in logUrl and partialLink != child.url:
                     childrenPages.append(childPage(partialLink,child.hops+1))
                     logUrl.append(partialLink)
+                    childUrls.append(partialLink)
+
+        # Data to be written
+
+
+        with open(f"DataFiles/{school}.csv", 'a',newline='') as f:
+            writer = csv.writer(f)
+            
+            writer.writerow([title.string,child.url,textStr,childUrls])
+
         return 1
 
 
     except:
-        #print("error at this url: " + child.url +" Skiped")
+        print("error at this url: " + child.url +" Skiped")
         return 0
 
 
@@ -83,12 +116,13 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     childrenPages.append(childPage(seed[1],0))
     
     while len(childrenPages):
-        #print(f'max hop: {MAX_HOPS}')
+        
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         if totalPages.value >= int(MAX_PAGE) or childrenPages[0].hops> int(MAX_HOPS) :
             childrenPages.clear()
             logUrl.clear()
             return 
+            
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         #print(f"working on url: {childrenPages[0].url}")
         #print(f"page saved so far: {totalPages}")
@@ -104,12 +138,14 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
         #sleep(0.01)
     childrenPages.clear()
     logUrl.clear()
+    print(f"ending edu: {school}")
     
     
 
 if __name__ == '__main__':
+    ENABLE_MULTIPROCESSING = True
     mp.freeze_support()
-    print(os.getcwd())
+    #print(os.getcwd())
     #path =  "us_universities.csv"
     path = input("Enter Seeds file path:")
     fileDir = os.getcwd()
@@ -131,36 +167,40 @@ if __name__ == '__main__':
     MAX_HOPS = input("Enter Max number of Hops:")
     #print(f"max : {MAX_HOPS}")
     num_cores = int(mp.cpu_count())
-   
-    print("This PC has: " + str(num_cores) + " cores")
-    numProcess = input("Enter number of process, or 'Enter' to use default core value:")
-    if numProcess != "":
-        if int(numProcess) > 0 and int(numProcess) <99:
-            num_cores = int(numProcess)
+    if ENABLE_MULTIPROCESSING:
+        print("This PC has: " + str(num_cores) + " cores")
+        numProcess = input("Enter number of process, or 'Enter' to use default core value:")
+        if numProcess != "":
+            if int(numProcess) > 0 and int(numProcess) <99:
+                num_cores = int(numProcess)
     
     csv_reader = csv.reader(open(path))
     seeds = [line for line in csv_reader]
     if 'http' not in seeds[0]:seeds.pop(0) #remove head
-    # for seed in seeds:
-    #     a=eduCrawler(seed)
-    #     exit(1)
+    
+    
     start_t=datetime.datetime.now()
     totalPages = Value('i', 0)
-    try:
-        pool = mp.Pool(num_cores, initializer = init, initargs = (totalPages, ))
-        for seed in seeds:
-            if totalPages.value >= int(MAX_PAGE):
-                break
-            i =pool.apply_async(eduCrawler, args=(seed,MAX_PAGE,MAX_HOPS,), callback=None)
+    if ENABLE_MULTIPROCESSING:
+        try:
+            pool = mp.Pool(num_cores, initializer = init, initargs = (totalPages, ))
+            for seed in seeds:
+                if totalPages.value >= int(MAX_PAGE):
+                    break
+                i =pool.apply_async(eduCrawler, args=(seed,MAX_PAGE,MAX_HOPS,), callback=None)
 
-        pool.close()
-        pool.join()
-    except KeyboardInterrupt:
-        pool.terminate()
-        pool.join()
+            pool.close()
+            pool.join()
+        except KeyboardInterrupt:
+            pool.terminate()
+            pool.join()
+    else:
+        for seed in seeds:
+            eduCrawler(seed,MAX_PAGE,MAX_HOPS)
+        
     end_t = datetime.datetime.now()
     elapsed_sec = (end_t - start_t).total_seconds()
     elapsed_min = elapsed_sec // 60
     elapsed_sec = elapsed_sec % 60
     print("Total Time :" "{:.0f}".format(elapsed_min) + " Minutes " + "{:.2f}".format(elapsed_sec) + "sec")
-    exit = input("program finished, enter 'y' to exit")
+    exit = input("program finished, enter 'y' to exit\n")
