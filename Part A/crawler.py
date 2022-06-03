@@ -76,8 +76,9 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
         textStr = ""
         for t in text:
             if t != "\n":
-                textStr+=(" " +t)
+                textStr+=(" " +t.replace( ',', ''))
         textStr=(unicodedata.normalize('NFKD', textStr).encode('ascii', 'ignore'))
+       
         childUrls = []
         hyperLinks = allPage.findAll("a", href=True)
         
