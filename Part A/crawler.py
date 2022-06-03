@@ -1,7 +1,7 @@
 from random import seed
 from time import sleep
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 import csv
 import multiprocessing as mp
 import os
@@ -55,7 +55,14 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
         allPage = BeautifulSoup(response.content, "html.parser",from_encoding="iso-8859-1")
         #print(allPage)
         
-        title = allPage.find('title')
+        #remove all comment tags 
+        div = allPage.find('div')
+        for element in div(text=lambda text: isinstance(text, Comment)):
+            element.extract()
+
+
+        title = allPage.find('title').string.replace( ',', '')
+
         allowlist = [
         'p',
         'div',
@@ -69,7 +76,7 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
         textStr = ""
         for t in text:
             if t != "\n":
-                textStr+=t
+                textStr+=(" " +t)
         textStr=(unicodedata.normalize('NFKD', textStr).encode('ascii', 'ignore'))
         childUrls = []
         hyperLinks = allPage.findAll("a", href=True)
@@ -91,7 +98,7 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
         with open(f"DataFiles/{school}.csv", 'a',newline='') as f:
             writer = csv.writer(f)
             
-            writer.writerow([title.string,child.url,textStr,childUrls])
+            writer.writerow([title,child.url,textStr,childUrls])
 
         return 1
 
@@ -143,7 +150,7 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     
 
 if __name__ == '__main__':
-    ENABLE_MULTIPROCESSING = True
+    ENABLE_MULTIPROCESSING = False
     mp.freeze_support()
     #print(os.getcwd())
     #path =  "us_universities.csv"
