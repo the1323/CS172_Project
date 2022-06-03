@@ -65,7 +65,7 @@ def ParseHTML(seed,child, hops, childrenPages, fileCounter, logUrl, school):
             element.extract()
 
 
-        title = allPage.find('title').string.replace( ',', '')
+        title = allPage.find('title').string.replace( ',', '').replace( '\n', '')
         
         allowlist = [
         'p',
@@ -80,7 +80,7 @@ def ParseHTML(seed,child, hops, childrenPages, fileCounter, logUrl, school):
         textStr = " "
         for t in text:
             if t != "\n":
-                textStr+=(" " +t.replace( ',', ''))
+                textStr+=(" " +t.replace( ',', '').replace( '\n', ''))
         textStr=(unicodedata.normalize('NFKD', textStr).encode('ascii', 'ignore'))
           
         childUrls = []
