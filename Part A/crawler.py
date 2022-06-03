@@ -11,6 +11,8 @@ from multiprocessing import Value
 import json
 import unicodedata
 import urllib3
+import lxml
+import cchardet
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 totalPages = None
@@ -52,9 +54,10 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
             return 0
         #saveFile(f"DataFiles/{school}_{fileCounter}.html", response.text, 'w')
         LogFile(school, child.url, fileCounter,len(response.content))
-        allPage = BeautifulSoup(response.content, "html.parser",from_encoding="iso-8859-1")
-        #print(allPage)
         
+        allPage = BeautifulSoup(response.content, "lxml",from_encoding="iso-8859-1")
+        #print(allPage)
+       
         #remove all comment tags 
         div = allPage.find('div')
         for element in div(text=lambda text: isinstance(text, Comment)):
@@ -62,7 +65,7 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
 
 
         title = allPage.find('title').string.replace( ',', '')
-
+        
         allowlist = [
         'p',
         'div',
@@ -70,7 +73,7 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
         ]
 
         text = [t for t in allPage.findAll(text=True) if t.parent.name in allowlist]
-        
+          
         
         # get all visible text, since some site write stuff outside of body tag, I just get everything, even though lots of useless data..
         textStr = ""
@@ -78,7 +81,7 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
             if t != "\n":
                 textStr+=(" " +t.replace( ',', ''))
         textStr=(unicodedata.normalize('NFKD', textStr).encode('ascii', 'ignore'))
-       
+          
         childUrls = []
         hyperLinks = allPage.findAll("a", href=True)
         
@@ -94,7 +97,7 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
                     childUrls.append(partialLink)
 
         # Data to be written
-
+         
 
         with open(f"DataFiles/{school}.csv", 'a',newline='') as f:
             writer = csv.writer(f)
