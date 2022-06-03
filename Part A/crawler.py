@@ -6,7 +6,7 @@ import csv
 import multiprocessing as mp
 import os
 import datetime
-import time
+from timeit import default_timer as timer
 from multiprocessing import Value
 import json
 import unicodedata
@@ -43,14 +43,15 @@ def LogFile(school, url, fileCounter,fSize):
     # saveFile("log.txt",f"{school},{fileCounter},{url}\n",'a')
 
 
-def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
+def ParseHTML(seed,child, hops, childrenPages, fileCounter, logUrl, school):
     global totalPages
 
     try:
-        
+
         response = requests.get(child.url, verify = False)
         
-        if not response.ok:
+        if response.ok == False:
+            print("status false ")
             return 0
         #saveFile(f"DataFiles/{school}_{fileCounter}.html", response.text, 'w')
         LogFile(school, child.url, fileCounter,len(response.content))
@@ -71,12 +72,12 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
         'div',
         'span'
         ]
-
+        
         text = [t for t in allPage.findAll(text=True) if t.parent.name in allowlist]
           
         
         # get all visible text, since some site write stuff outside of body tag, I just get everything, even though lots of useless data..
-        textStr = ""
+        textStr = " "
         for t in text:
             if t != "\n":
                 textStr+=(" " +t.replace( ',', ''))
@@ -85,20 +86,19 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
         childUrls = []
         hyperLinks = allPage.findAll("a", href=True)
         
+        
         for link in hyperLinks:
-            
             partialLink = link['href']
-            # print(link['href'])
+            
             if partialLink[0] == '/':
-                partialLink = child.url + partialLink[1:]
+                partialLink = seed + partialLink[1:]
                 if partialLink not in logUrl and partialLink != child.url:
                     childrenPages.append(childPage(partialLink,child.hops+1))
                     logUrl.append(partialLink)
                     childUrls.append(partialLink)
 
         # Data to be written
-         
-
+        
         with open(f"DataFiles/{school}.csv", 'a',newline='') as f:
             writer = csv.writer(f)
             
@@ -114,7 +114,8 @@ def ParseHTML(child, hops, childrenPages, fileCounter, logUrl, school):
 
 def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     global totalPages
-    
+    perEduCounter =0
+    start = timer()
     if totalPages.value >= int(MAX_PAGE):
         return 
     school = seed[0]
@@ -127,7 +128,14 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     childrenPages.append(childPage(seed[1],0))
     
     while len(childrenPages):
-        
+        end = timer()
+        # if cant finish 30 doc in 1 minute, skip this edu
+        if (end - start)>60 and perEduCounter < 30:
+            print(f"edu limit too restrict, skip {school}")
+            return 
+        else:
+            start = timer()
+            perEduCounter = 0
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         if totalPages.value >= int(MAX_PAGE) or childrenPages[0].hops> int(MAX_HOPS) :
             childrenPages.clear()
@@ -137,7 +145,7 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
         #print(f"Queue: {len(childrenPages)}, saved: {fileCounter} current Hop: {childrenPages[0].hops}")
         #print(f"working on url: {childrenPages[0].url}")
         #print(f"page saved so far: {totalPages}")
-        count = ParseHTML(childrenPages[0], 0, childrenPages, fileCounter, logUrl, school)
+        count = ParseHTML(seed[1],childrenPages[0], 0, childrenPages, fileCounter, logUrl, school)
         if totalPages.value %10 ==0: 
             print(f"total: {totalPages.value} max: {MAX_PAGE}...")
         
@@ -145,6 +153,7 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
         with totalPages.get_lock():
             totalPages.value += count
         fileCounter += 1
+        perEduCounter +=count
         childrenPages.pop(0)
         #sleep(0.01)
     childrenPages.clear()
