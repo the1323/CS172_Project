@@ -13,9 +13,18 @@ import unicodedata
 import urllib3
 import lxml
 import cchardet
+from urllib.request import Request, urlopen
+
+from fake_useragent import UserAgent
+import random
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+aproxies = ""
+
+USER_AGENT= ""
 totalPages = None
+ua = UserAgent()
 class childPage:
     def __init__(self, url, hops):
         self.url = url
@@ -25,7 +34,11 @@ def init(args):
     #shared page counter
     global totalPages
     totalPages = args
+def random_ua():
+  return ua.random 
 
+def random_proxy():
+  return random.randint(0, len(proxies) - 1)
 
 def saveFile(fname, data, mode):
     #print(fname)
@@ -45,10 +58,12 @@ def LogFile(school, url, fileCounter,fSize):
 
 def ParseHTML(seed,child, hops, childrenPages, fileCounter, logUrl, school):
     global totalPages
-
+    global HEADERS
     try:
-
-        response = requests.get(child.url, verify = False)
+        
+        
+        #print(USER_AGENT)
+        response = requests.get(child.url,headers=HEADERS, verify = False)
         
         if response.ok == False:
             print("status false ")
@@ -96,6 +111,11 @@ def ParseHTML(seed,child, hops, childrenPages, fileCounter, logUrl, school):
                     childrenPages.append(childPage(partialLink,child.hops+1))
                     logUrl.append(partialLink)
                     childUrls.append(partialLink)
+            elif ".edu" in partialLink:
+                if partialLink not in logUrl and partialLink != child.url:
+                    childrenPages.append(childPage(partialLink,child.hops+1))
+                    childUrls.append(partialLink)
+                    logUrl.append(partialLink)
 
         # Data to be written
         
@@ -103,7 +123,7 @@ def ParseHTML(seed,child, hops, childrenPages, fileCounter, logUrl, school):
             writer = csv.writer(f)
             
             writer.writerow([title,child.url,textStr,childUrls])
-
+        
         return 1
 
 
@@ -114,6 +134,7 @@ def ParseHTML(seed,child, hops, childrenPages, fileCounter, logUrl, school):
 
 def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     global totalPages
+    global USER_AGENT
     perEduCounter =0
     start = timer()
     if totalPages.value >= int(MAX_PAGE):
@@ -146,16 +167,18 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
         #print(f"working on url: {childrenPages[0].url}")
         #print(f"page saved so far: {totalPages}")
         count = ParseHTML(seed[1],childrenPages[0], 0, childrenPages, fileCounter, logUrl, school)
-        if totalPages.value %10 ==0: 
-            print(f"total: {totalPages.value} max: {MAX_PAGE}...")
+        #if totalPages.value %10 ==0: 
+        print(f"total: {totalPages.value} max: {MAX_PAGE}...")
         
         #print(f"totalPages {totalPages.value}")
         with totalPages.get_lock():
             totalPages.value += count
+            if totalPages.value % 30 == 0:
+                USER_AGENT = random_ua()
         fileCounter += 1
         perEduCounter +=count
         childrenPages.pop(0)
-        #sleep(0.01)
+        sleep(0.1)
     childrenPages.clear()
     logUrl.clear()
     print(f"ending edu: {school}")
@@ -163,7 +186,30 @@ def eduCrawler(seed,MAX_PAGE,MAX_HOPS):
     
 
 if __name__ == '__main__':
-    ENABLE_MULTIPROCESSING = False
+
+
+    proxies = []
+    proxies_req = Request('https://www.sslproxies.org/')
+    proxies_req.add_header('User-Agent', ua.random)
+    proxies_doc = urlopen(proxies_req).read().decode('utf8')
+    soup = BeautifulSoup(proxies_doc, 'html.parser')
+    proxies_table = soup.find("tbody")
+
+    # Save proxies in the array
+    for row in proxies_table.find_all('tr'):
+        proxies.append({
+            'ip':   row.find_all('td')[0].string,
+            'port': row.find_all('td')[1].string
+        })
+
+    proxy_index = random_proxy()
+    proxy = proxies[proxy_index]
+   
+    aproxies = {
+    "http": f"http://{proxy['ip']}:{proxy['port']}",
+    "https": f"https://{proxy['ip']}:{proxy['port']}",
+    }
+    ENABLE_MULTIPROCESSING = True
     mp.freeze_support()
     #print(os.getcwd())
     #path =  "us_universities.csv"
